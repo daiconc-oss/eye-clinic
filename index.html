@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>眼科門診診前主訴報到 (pt ver.3.0 - 極速穩定版)</title>
+    <title>眼科門診診前主訴報到 (pt ver.3.1 - 下載修正版)</title>
     <!-- 使用穩定且高相容性的 qrcode-generator 套件 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
     <style>
@@ -606,20 +606,17 @@
         document.getElementById('form-inputs').scrollIntoView({ behavior: 'smooth' });
     }
 
-    // 利用 qrcode-generator 同步計算並繪製 Canvas，輸出穩定 Base64 圖檔
     function generateQRCodes() {
         const qrListContainer = document.getElementById('qr-list');
         qrListContainer.innerHTML = "";
         
         const todayStr = new Date().toISOString().split('T')[0];
 
-        // 切換顯示
         document.getElementById('preview-area').style.display = 'none';
         document.getElementById('result-area').style.display = 'block';
         document.getElementById('result-area').scrollIntoView({ behavior: 'smooth' });
 
         patientsCompiledData.forEach((p, idx) => {
-            // 1. 初始化 QR Code 矩陣 (Type 0 自動計算尺寸，修正率 M)
             const qr = qrcode(0, 'M');
             qr.addData(p.qrPayload);
             qr.make();
@@ -628,17 +625,14 @@
             const qrSize = 200; 
             const cellSize = qrSize / moduleCount;
 
-            // 2. 建立 Canvas 並繪製條碼與文字卡片
             const finalCanvas = document.createElement('canvas');
             const ctx = finalCanvas.getContext('2d');
             finalCanvas.width = 300;
             finalCanvas.height = 360;
 
-            // 背景填白
             ctx.fillStyle = '#ffffff';
             ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
 
-            // 標題與文字資訊
             ctx.fillStyle = '#1e293b';
             ctx.font = 'bold 20px sans-serif';
             ctx.textAlign = 'center';
@@ -648,7 +642,6 @@
             ctx.font = '14px sans-serif';
             ctx.fillText(`生日：${p.dob}`, 150, 60);
 
-            // 繪製黑白格子 (居中放置，offsetX: 50, offsetY: 75)
             const offsetX = 50;
             const offsetY = 75;
 
@@ -659,48 +652,38 @@
                         ctx.fillRect(
                             offsetX + col * cellSize,
                             offsetY + row * cellSize,
-                            cellSize + 0.5, // 加上 0.5 避免縮放時的微小白縫
+                            cellSize + 0.5,
                             cellSize + 0.5
                         );
                     }
                 }
             }
 
-            // 底部說明文字
             ctx.fillStyle = '#1a56db';
             ctx.font = 'bold 13px sans-serif';
             ctx.fillText(`眼科門診報到條碼 (${todayStr})`, 150, 305);
 
-            // 轉為 DataURL PNG 格式
             const imgDataUrl = finalCanvas.toDataURL('image/png');
             const cleanDob = p.dob.replace(/-/g, '');
             const filename = `${p.name}_${cleanDob}_報到條碼_${todayStr}.png`;
 
-            // 動態創建前端顯示節點
             const card = document.createElement('div');
             card.className = 'qr-person-card';
+            
+            // 修正重點：使用標準原生 <a> 標籤屬性進行單次下載，完全不呼叫重複點擊的 JavaScript 函式
             card.innerHTML = `
                 <div class="person-info" style="text-align: center;">第 ${idx + 1} 位：${p.name} (${p.dob})</div>
                 <div class="generated-img-container">
                     <img src="${imgDataUrl}" alt="${p.name} 的報到 QR Code">
                 </div>
                 <div>
-                    <a href="${imgDataUrl}" download="${filename}" class="btn-save" onclick="handleDownload(event, '${imgDataUrl}', '${filename}')">
+                    <a href="${imgDataUrl}" download="${filename}" class="btn-save">
                         💾 下載條碼圖片 (${p.name})
                     </a>
                 </div>
             `;
             qrListContainer.appendChild(card);
         });
-    }
-
-    function handleDownload(e, dataUrl, filename) {
-        const a = document.createElement('a');
-        a.href = dataUrl;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
     }
 </script>
 
