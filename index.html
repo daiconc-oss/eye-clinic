@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>眼科門診診前主訴報到 (pt ver.3.0 - 極速穩定版)</title>
+    <!-- 使用穩定且高相容性的 qrcode-generator 套件 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            touch-action: manipulation;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f4f6f9;
+            margin: 0;
+            padding: 16px;
+            color: #333;
+        }
+        .container {
+            max-width: 480px;
+            margin: 0 auto;
+            background: #ffffff;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+        h2 {
+            text-align: center;
+            color: #1a56db;
+            margin-top: 0;
+            font-size: 22px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            font-size: 13px;
+            margin-bottom: 16px;
+        }
+        .form-group {
+            margin-bottom: 16px;
+        }
+        label.group-title {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 8px;
+            font-size: 15px;
+        }
+        input[type="text"], input[type="date"] {
+            width: 100%;
+            padding: 12px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            background-color: #fff;
+        }
+
+        /* 頁籤 Tab 樣式 */
+        .patient-tabs {
+            display: flex;
+            gap: 6px;
+            overflow-x: auto;
+            padding-bottom: 8px;
+            margin-bottom: 12px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+        .tab-btn {
+            background-color: #e5e7eb;
+            color: #4b5563;
+            border: none;
+            padding: 8px 14px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .tab-btn.active {
+            background-color: #1a56db;
+            color: #ffffff;
+        }
+
+        /* 病人卡片 */
+        .patient-card {
+            display: none;
+            background-color: #ffffff;
+        }
+        .patient-card.active {
+            display: block;
+        }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            background-color: #eff6ff;
+            padding: 10px 12px;
+            border-radius: 6px;
+        }
+        .card-title {
+            font-weight: bold;
+            color: #1d4ed8;
+            font-size: 15px;
+        }
+        .btn-delete-patient {
+            background: #ef4444;
+            color: white;
+            border: none;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        /* 新增頁籤按鈕 */
+        .btn-add-patient {
+            width: 100%;
+            background-color: #f0fdf4;
+            color: #166534;
+            border: 1px dashed #22c55e;
+            padding: 10px;
+            font-size: 15px;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-bottom: 16px;
+        }
+
+        /* 主訴卡片樣式 */
+        .symptom-card {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            background-color: #fafafa;
+            margin-bottom: 10px;
+            overflow: hidden;
+        }
+        .symptom-card.active {
+            border-color: #1a56db;
+            background-color: #ffffff;
+            box-shadow: 0 2px 6px rgba(26, 86, 219, 0.08);
+        }
+        .symptom-header {
+            display: flex;
+            align-items: center;
+            padding: 10px 12px;
+            cursor: pointer;
+            user-select: none;
+        }
+        .symptom-header input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            cursor: pointer;
+        }
+        .symptom-header label {
+            margin: 0;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            flex-grow: 1;
+        }
+
+        /* 動態展開區域 */
+        .symptom-details {
+            display: none;
+            padding: 10px 12px 14px 12px;
+            background-color: #f8fafc;
+            border-top: 1px dashed #e2e8f0;
+        }
+        .detail-title {
+            font-size: 12px;
+            color: #64748b;
+            font-weight: bold;
+            margin-top: 6px;
+            margin-bottom: 6px;
+        }
+
+        /* 按鈕選項組 */
+        .btn-group {
+            display: grid;
+            gap: 6px;
+        }
+        .grid-3 { grid-template-columns: repeat(3, 1fr); }
+        .grid-4 { grid-template-columns: repeat(2, 1fr); }
+
+        .btn-option {
+            position: relative;
+        }
+        .btn-option input {
+            position: absolute;
+            opacity: 0;
+            cursor: pointer;
+        }
+        .btn-option label {
+            display: block;
+            text-align: center;
+            padding: 6px 2px;
+            background-color: #ffffff;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #334155;
+            cursor: pointer;
+            margin: 0;
+            user-select: none;
+        }
+        .btn-option input:checked + label {
+            background-color: #eff6ff;
+            border-color: #1a56db;
+            color: #1a56db;
+            font-weight: bold;
+        }
+
+        /* 按鈕樣式 */
+        .btn-primary {
+            width: 100%;
+            background-color: #1a56db;
+            color: white;
+            border: none;
+            padding: 14px;
+            font-size: 17px;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        .btn-primary:active { background-color: #1e40af; }
+
+        .btn-secondary {
+            width: 100%;
+            background-color: #f3f4f6;
+            color: #374151;
+            border: 1px solid #d1d5db;
+            padding: 12px;
+            font-size: 15px;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 8px;
+        }
+
+        .btn-save {
+            background-color: #0284c7;
+            color: white;
+            border: none;
+            padding: 10px 18px;
+            font-size: 15px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-top: 10px;
+            display: inline-block;
+            text-decoration: none;
+        }
+
+        /* 預覽與結果卡片樣式 */
+        #preview-area, #result-area {
+            display: none;
+            margin-top: 20px;
+        }
+
+        .preview-person-card, .qr-person-card {
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            padding: 16px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+            text-align: left;
+        }
+
+        .qr-person-card {
+            text-align: center;
+            border-color: #93c5fd;
+            background-color: #f8fafc;
+        }
+
+        .person-info {
+            font-size: 16px;
+            font-weight: bold;
+            color: #1e293b;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 6px;
+            margin-bottom: 10px;
+        }
+
+        .symptom-tag {
+            display: inline-block;
+            background-color: #eff6ff;
+            color: #1d4ed8;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 13px;
+            margin-top: 4px;
+        }
+
+        /* 合成圖片容器 */
+        .generated-img-container img {
+            width: 240px;
+            height: auto;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+            margin: 10px auto;
+            display: block;
+            background-color: #fff;
+        }
+
+        .alert-text {
+            color: #d97706;
+            font-size: 13px;
+            background-color: #fef3c7;
+            padding: 10px;
+            border-radius: 6px;
+            margin-top: 12px;
+            text-align: left;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>門診診前報到表</h2>
+    <div class="subtitle">可同時為多位家屬報到，每位將各自產生專屬條碼</div>
+
+    <form id="checkin-form">
+        <div id="form-inputs">
+            <!-- 家屬頁籤列 -->
+            <div class="patient-tabs" id="patient-tabs"></div>
+
+            <!-- 家屬卡片容器 -->
+            <div id="patients-container"></div>
+
+            <button type="button" class="btn-add-patient" onclick="addPatient()">＋ 新增一位看診家屬</button>
+
+            <button type="button" class="btn-primary" onclick="showPreview()">下一步：預覽資料</button>
+        </div>
+
+        <!-- 預覽與確認區塊 -->
+        <div id="preview-area">
+            <h3 style="color: #1a56db; margin-top: 0; text-align: center;">📋 確認報到家屬資料</h3>
+            <div id="preview-list"></div>
+
+            <button type="button" class="btn-primary" style="background-color: #16a34a;" onclick="generateQRCodes()">✅ 確認無誤，產生個別 QR Code</button>
+            <button type="button" class="btn-secondary" onclick="editForm()">✏️ 返回修改 / 增加人員</button>
+        </div>
+    </form>
+
+    <!-- 掃瞄結果區 -->
+    <div id="result-area">
+        <h3 style="color: #059669; margin-top: 0; text-align: center;">已完成報到設定！</h3>
+        <p style="font-size: 14px; color: #4b5563; text-align: center;">請出示或保存以下專屬條碼，供櫃檯掃描列印小張貼紙</p>
+
+        <!-- 產出的 QR Code 卡片會被放入此區域 -->
+        <div id="qr-list"></div>
+
+        <div class="alert-text">
+            💡 <b>如何儲存照片到手機相簿？</b><br>
+            1. 點擊「💾 下載條碼圖片」按鈕。<br>
+            2. 若手機未自動開始下載，請<b>直接長按上方條碼圖片</b>，選擇<b>「儲存到照片」</b>或<b>「下載影像」</b>即可！
+        </div>
+        <button type="button" class="btn-secondary" onclick="editForm()" style="margin-top: 16px;">✏️ 重新修改資料</button>
+    </div>
+</div>
+
+<script>
+    const symptomsData = [
+        { id: 'cc1', name: '👓 驗光 / 視力模糊 / 配鏡', code: '視力模糊' },
+        { id: 'cc2', name: '👁️ 眼睛紅痛 / 乾澀 / 分泌物', code: '紅痛乾澀' },
+        { id: 'cc3', name: '🦟 飛蚊症 / 看見黑點 / 閃光', code: '飛蚊閃光' },
+        { id: 'cc4', name: '🩸 白內障 / 黃斑部諮詢追蹤', code: '白內障黃斑部' },
+        { id: 'cc5', name: '💊 慢性病拿藥 / 定期追蹤', code: '慢性病拿藥' },
+        { id: 'cc6', name: '📋 開立診斷證明書 / 收據', code: '開立證明' }
+    ];
+
+    let patientCount = 0;
+    let patientList = [];
+    let patientsCompiledData = [];
+
+    window.onload = function() {
+        addPatient();
+    };
+
+    function addPatient() {
+        if (patientList.length >= 5) {
+            alert('一次最多可填寫 5 位家屬！');
+            return;
+        }
+
+        patientCount++;
+        const pId = patientCount;
+        patientList.push(pId);
+
+        const tabBtn = document.createElement('button');
+        tabBtn.type = 'button';
+        tabBtn.className = 'tab-btn';
+        tabBtn.id = `tab-${pId}`;
+        tabBtn.innerText = `家屬 ${patientList.length}`;
+        tabBtn.onclick = () => switchTab(pId);
+        document.getElementById('patient-tabs').appendChild(tabBtn);
+
+        const card = document.createElement('div');
+        card.className = 'patient-card';
+        card.id = `patient-card-${pId}`;
+
+        let symptomsHtml = "";
+        symptomsData.forEach(s => {
+            symptomsHtml += `
+                <div class="symptom-card" id="card-${pId}-${s.id}">
+                    <div class="symptom-header">
+                        <input type="checkbox" id="${pId}-${s.id}" value="${s.code}" onchange="toggleSymptom('${pId}', '${s.id}')">
+                        <label for="${pId}-${s.id}">${s.name}</label>
+                    </div>
+                    <div class="symptom-details" id="details-${pId}-${s.id}">
+                        <div class="detail-title">請問是哪一隻眼睛？</div>
+                        <div class="btn-group grid-3">
+                            <div class="btn-option">
+                                <input type="radio" id="eye_${pId}_${s.id}_r" name="eye_${pId}_${s.id}" value="右眼">
+                                <label for="eye_${pId}_${s.id}_r">右眼(OD)</label>
+                            </div>
+                            <div class="btn-option">
+                                <input type="radio" id="eye_${pId}_${s.id}_l" name="eye_${pId}_${s.id}" value="左眼">
+                                <label for="eye_${pId}_${s.id}_l">左眼(OS)</label>
+                            </div>
+                            <div class="btn-option">
+                                <input type="radio" id="eye_${pId}_${s.id}_b" name="eye_${pId}_${s.id}" value="雙眼" checked>
+                                <label for="eye_${pId}_${s.id}_b">雙眼(OU)</label>
+                            </div>
+                        </div>
+
+                        <div class="detail-title">這項症狀持續多久了？</div>
+                        <div class="btn-group grid-4">
+                            <div class="btn-option">
+                                <input type="radio" id="dur_${pId}_${s.id}_1" name="dur_${pId}_${s.id}" value="今天剛發生" checked>
+                                <label for="dur_${pId}_${s.id}_1">今天剛發生</label>
+                            </div>
+                            <div class="btn-option">
+                                <input type="radio" id="dur_${pId}_${s.id}_2" name="dur_${pId}_${s.id}" value="數天內">
+                                <label for="dur_${pId}_${s.id}_2">數天內</label>
+                            </div>
+                            <div class="btn-option">
+                                <input type="radio" id="dur_${pId}_${s.id}_3" name="dur_${pId}_${s.id}" value="數週內">
+                                <label for="dur_${pId}_${s.id}_3">數週內</label>
+                            </div>
+                            <div class="btn-option">
+                                <input type="radio" id="dur_${pId}_${s.id}_4" name="dur_${pId}_${s.id}" value="數月/更久">
+                                <label for="dur_${pId}_${s.id}_4">數月或更久</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        card.innerHTML = `
+            <div class="card-header">
+                <span class="card-title">👤 第 ${patientList.length} 位看診病人</span>
+                ${patientList.length > 1 ? `<button type="button" class="btn-delete-patient" onclick="removePatient(${pId})">刪除此位</button>` : ''}
+            </div>
+            <div class="form-group">
+                <label class="group-title" for="name-${pId}">病人姓名</label>
+                <input type="text" id="name-${pId}" placeholder="請輸入姓名" oninput="updateTabName(${pId})" required>
+            </div>
+            <div class="form-group">
+                <label class="group-title" for="dob-${pId}">出生年月日</label>
+                <input type="date" id="dob-${pId}" required>
+            </div>
+            <div class="form-group">
+                <label class="group-title">今日看診原因與狀況（可多選）</label>
+                <div>${symptomsHtml}</div>
+            </div>
+        `;
+
+        document.getElementById('patients-container').appendChild(card);
+        switchTab(pId);
+    }
+
+    function switchTab(pId) {
+        patientList.forEach(id => {
+            const tab = document.getElementById(`tab-${id}`);
+            const card = document.getElementById(`patient-card-${id}`);
+            if (tab && card) {
+                if (id === pId) {
+                    tab.classList.add('active');
+                    card.classList.add('active');
+                } else {
+                    tab.classList.remove('active');
+                    card.classList.remove('active');
+                }
+            }
+        });
+    }
+
+    function updateTabName(pId) {
+        const nameVal = document.getElementById(`name-${pId}`).value.trim();
+        const tab = document.getElementById(`tab-${pId}`);
+        const idx = patientList.indexOf(pId) + 1;
+        if (tab) {
+            tab.innerText = nameVal ? nameVal : `家屬 ${idx}`;
+        }
+    }
+
+    function removePatient(pId) {
+        if (patientList.length <= 1) return;
+
+        patientList = patientList.filter(id => id !== pId);
+        document.getElementById(`tab-${pId}`).remove();
+        document.getElementById(`patient-card-${pId}`).remove();
+
+        patientList.forEach((id) => {
+            updateTabName(id);
+        });
+
+        switchTab(patientList[0]);
+    }
+
+    function toggleSymptom(pId, sId) {
+        const checkbox = document.getElementById(`${pId}-${sId}`);
+        const card = document.getElementById(`card-${pId}-${sId}`);
+        const details = document.getElementById(`details-${pId}-${sId}`);
+
+        if (checkbox.checked) {
+            card.classList.add('active');
+            details.style.display = 'block';
+        } else {
+            card.classList.remove('active');
+            details.style.display = 'none';
+        }
+    }
+
+    function showPreview() {
+        patientsCompiledData = [];
+        let previewHtml = "";
+        let hasError = false;
+
+        for (let i = 0; i < patientList.length; i++) {
+            const pId = patientList[i];
+            const name = document.getElementById(`name-${pId}`).value.trim();
+            const dob = document.getElementById(`dob-${pId}`).value;
+
+            if (!name) {
+                alert(`請填寫第 ${i + 1} 位病人的姓名！`);
+                switchTab(pId);
+                hasError = true;
+                break;
+            }
+            if (!dob) {
+                alert(`請選擇【${name}】的出生年月日！`);
+                switchTab(pId);
+                hasError = true;
+                break;
+            }
+
+            let selectedSymptoms = [];
+            let symptomTags = "";
+
+            symptomsData.forEach(s => {
+                const checkbox = document.getElementById(`${pId}-${s.id}`);
+                if (checkbox && checkbox.checked) {
+                    const eye = document.querySelector(`input[name="eye_${pId}_${s.id}"]:checked`).value;
+                    const dur = document.querySelector(`input[name="dur_${pId}_${s.id}"]:checked`).value;
+                    
+                    selectedSymptoms.push(`${s.code}[${eye}/${dur}]`);
+                    symptomTags += `<div class="symptom-tag">📌 ${s.code}（<b>${eye}</b> / <b>${dur}</b>）</div><br>`;
+                }
+            });
+
+            if (selectedSymptoms.length === 0) {
+                alert(`請為【${name}】至少勾選一項看診原因！`);
+                switchTab(pId);
+                hasError = true;
+                break;
+            }
+
+            const qrPayload = `姓名:${name}|生日:${dob}|主訴:${selectedSymptoms.join(';')}`;
+            
+            patientsCompiledData.push({
+                name: name,
+                dob: dob,
+                symptomsSummary: symptomTags,
+                qrPayload: qrPayload
+            });
+
+            previewHtml += `
+                <div class="preview-person-card">
+                    <div class="person-info">👤 ${name} （生日：${dob}）</div>
+                    <div>${symptomTags}</div>
+                </div>
+            `;
+        }
+
+        if (hasError) return;
+
+        document.getElementById('preview-list').innerHTML = previewHtml;
+        document.getElementById('preview-area').style.display = 'block';
+        document.getElementById('result-area').style.display = 'none';
+        document.getElementById('preview-area').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function editForm() {
+        document.getElementById('preview-area').style.display = 'none';
+        document.getElementById('result-area').style.display = 'none';
+        document.getElementById('form-inputs').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    // 利用 qrcode-generator 同步計算並繪製 Canvas，輸出穩定 Base64 圖檔
+    function generateQRCodes() {
+        const qrListContainer = document.getElementById('qr-list');
+        qrListContainer.innerHTML = "";
+        
+        const todayStr = new Date().toISOString().split('T')[0];
+
+        // 切換顯示
+        document.getElementById('preview-area').style.display = 'none';
+        document.getElementById('result-area').style.display = 'block';
+        document.getElementById('result-area').scrollIntoView({ behavior: 'smooth' });
+
+        patientsCompiledData.forEach((p, idx) => {
+            // 1. 初始化 QR Code 矩陣 (Type 0 自動計算尺寸，修正率 M)
+            const qr = qrcode(0, 'M');
+            qr.addData(p.qrPayload);
+            qr.make();
+
+            const moduleCount = qr.getModuleCount();
+            const qrSize = 200; 
+            const cellSize = qrSize / moduleCount;
+
+            // 2. 建立 Canvas 並繪製條碼與文字卡片
+            const finalCanvas = document.createElement('canvas');
+            const ctx = finalCanvas.getContext('2d');
+            finalCanvas.width = 300;
+            finalCanvas.height = 360;
+
+            // 背景填白
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
+
+            // 標題與文字資訊
+            ctx.fillStyle = '#1e293b';
+            ctx.font = 'bold 20px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(p.name, 150, 36);
+
+            ctx.fillStyle = '#64748b';
+            ctx.font = '14px sans-serif';
+            ctx.fillText(`生日：${p.dob}`, 150, 60);
+
+            // 繪製黑白格子 (居中放置，offsetX: 50, offsetY: 75)
+            const offsetX = 50;
+            const offsetY = 75;
+
+            ctx.fillStyle = '#000000';
+            for (let row = 0; row < moduleCount; row++) {
+                for (let col = 0; col < moduleCount; col++) {
+                    if (qr.isDark(row, col)) {
+                        ctx.fillRect(
+                            offsetX + col * cellSize,
+                            offsetY + row * cellSize,
+                            cellSize + 0.5, // 加上 0.5 避免縮放時的微小白縫
+                            cellSize + 0.5
+                        );
+                    }
+                }
+            }
+
+            // 底部說明文字
+            ctx.fillStyle = '#1a56db';
+            ctx.font = 'bold 13px sans-serif';
+            ctx.fillText(`眼科門診報到條碼 (${todayStr})`, 150, 305);
+
+            // 轉為 DataURL PNG 格式
+            const imgDataUrl = finalCanvas.toDataURL('image/png');
+            const cleanDob = p.dob.replace(/-/g, '');
+            const filename = `${p.name}_${cleanDob}_報到條碼_${todayStr}.png`;
+
+            // 動態創建前端顯示節點
+            const card = document.createElement('div');
+            card.className = 'qr-person-card';
+            card.innerHTML = `
+                <div class="person-info" style="text-align: center;">第 ${idx + 1} 位：${p.name} (${p.dob})</div>
+                <div class="generated-img-container">
+                    <img src="${imgDataUrl}" alt="${p.name} 的報到 QR Code">
+                </div>
+                <div>
+                    <a href="${imgDataUrl}" download="${filename}" class="btn-save" onclick="handleDownload(event, '${imgDataUrl}', '${filename}')">
+                        💾 下載條碼圖片 (${p.name})
+                    </a>
+                </div>
+            `;
+            qrListContainer.appendChild(card);
+        });
+    }
+
+    function handleDownload(e, dataUrl, filename) {
+        const a = document.createElement('a');
+        a.href = dataUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
+</script>
+
+</body>
+</html>
