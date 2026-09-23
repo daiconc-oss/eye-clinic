@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>眼科門診診前主訴報到 (pt ver.3.1 - 下載修正版)</title>
+    <title>眼科門診診前主訴報到 (pt ver.3.3 - 同一家人標記版)</title>
     <!-- 使用穩定且高相容性的 qrcode-generator 套件 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
     <style>
@@ -535,8 +535,9 @@
         patientsCompiledData = [];
         let previewHtml = "";
         let hasError = false;
+        const totalPatients = patientList.length; // 自動計算當前總掛號人數
 
-        for (let i = 0; i < patientList.length; i++) {
+        for (let i = 0; i < totalPatients; i++) {
             const pId = patientList[i];
             const name = document.getElementById(`name-${pId}`).value.trim();
             const dob = document.getElementById(`dob-${pId}`).value;
@@ -575,18 +576,25 @@
                 break;
             }
 
-            const qrPayload = `姓名:${name}|生日:${dob}|主訴:${selectedSymptoms.join(';')}`;
+            // 同一家人標記，格式為：同一家人(1/3)
+            const familyTag = totalPatients > 1 ? `同一家人(${i + 1}/${totalPatients})` : '';
+            const qrPayload = `姓名:${name}|生日:${dob}${familyTag ? '|註記:' + familyTag : ''}|主訴:${selectedSymptoms.join(';')}`;
             
             patientsCompiledData.push({
                 name: name,
                 dob: dob,
+                familyTag: familyTag,
+                totalPatients: totalPatients,
                 symptomsSummary: symptomTags,
                 qrPayload: qrPayload
             });
 
             previewHtml += `
                 <div class="preview-person-card">
-                    <div class="person-info">👤 ${name} （生日：${dob}）</div>
+                    <div class="person-info">
+                        👤 ${name} （生日：${dob}） 
+                        ${familyTag ? `<span style="color:#1a56db; font-size:14px; float:right;">🏠 ${familyTag}</span>` : ''}
+                    </div>
                     <div>${symptomTags}</div>
                 </div>
             `;
@@ -622,7 +630,7 @@
             qr.make();
 
             const moduleCount = qr.getModuleCount();
-            const qrSize = 200; 
+            const qrSize = 190; 
             const cellSize = qrSize / moduleCount;
 
             const finalCanvas = document.createElement('canvas');
@@ -633,16 +641,19 @@
             ctx.fillStyle = '#ffffff';
             ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
 
+            // 標題顯示姓名與「同一家人」標記
             ctx.fillStyle = '#1e293b';
             ctx.font = 'bold 20px sans-serif';
             ctx.textAlign = 'center';
-            ctx.fillText(p.name, 150, 36);
+            
+            const titleText = p.familyTag ? `${p.name} (${p.familyTag})` : p.name;
+            ctx.fillText(titleText, 150, 36);
 
             ctx.fillStyle = '#64748b';
             ctx.font = '14px sans-serif';
             ctx.fillText(`生日：${p.dob}`, 150, 60);
 
-            const offsetX = 50;
+            const offsetX = (300 - qrSize) / 2;
             const offsetY = 75;
 
             ctx.fillStyle = '#000000';
@@ -670,9 +681,11 @@
             const card = document.createElement('div');
             card.className = 'qr-person-card';
             
-            // 修正重點：使用標準原生 <a> 標籤屬性進行單次下載，完全不呼叫重複點擊的 JavaScript 函式
             card.innerHTML = `
-                <div class="person-info" style="text-align: center;">第 ${idx + 1} 位：${p.name} (${p.dob})</div>
+                <div class="person-info" style="text-align: center;">
+                    第 ${idx + 1} 位：${p.name} (${p.dob})
+                    ${p.familyTag ? `<span style="color:#1a56db; font-size:14px;"> - 🏠 ${p.familyTag}</span>` : ''}
+                </div>
                 <div class="generated-img-container">
                     <img src="${imgDataUrl}" alt="${p.name} 的報到 QR Code">
                 </div>
