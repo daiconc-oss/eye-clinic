@@ -3,9 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>眼科門診診前主訴報到 (pt ver.3.3 - 同一家人標記版)</title>
-    <!-- 使用穩定且高相容性的 qrcode-generator 套件 -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+    <title>眼科門診診前主訴報到 (pt ver.3.7 - 全員可刪除版)</title>
+
+    <!-- 採用完整支援中文 UTF-8 編碼與 HTML5 Canvas 的 EasyQRCodeJS -->
+    <script src="https://cdn.jsdelivr.net/npm/easyqrcodejs@4.5.0/dist/easy.qrcode.min.js"></script>
+
     <style>
         * {
             box-sizing: border-box;
@@ -318,6 +320,12 @@
             text-align: left;
             line-height: 1.5;
         }
+
+        #hidden-qr-store {
+            position: absolute;
+            left: -9999px;
+            top: -9999px;
+        }
     </style>
 </head>
 <body>
@@ -366,6 +374,8 @@
     </div>
 </div>
 
+<div id="hidden-qr-store"></div>
+
 <script>
     const symptomsData = [
         { id: 'cc1', name: '👓 驗光 / 視力模糊 / 配鏡', code: '視力模糊' },
@@ -379,6 +389,14 @@
     let patientCount = 0;
     let patientList = [];
     let patientsCompiledData = [];
+
+    function getLocalDateString() {
+        const d = new Date();
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
 
     window.onload = function() {
         addPatient();
@@ -457,8 +475,8 @@
 
         card.innerHTML = `
             <div class="card-header">
-                <span class="card-title">👤 第 ${patientList.length} 位看診病人</span>
-                ${patientList.length > 1 ? `<button type="button" class="btn-delete-patient" onclick="removePatient(${pId})">刪除此位</button>` : ''}
+                <span class="card-title" id="card-title-${pId}">👤 第 ${patientList.length} 位看診病人</span>
+                <button type="button" class="btn-delete-patient" id="btn-del-${pId}" onclick="removePatient(${pId})">刪除此位</button>
             </div>
             <div class="form-group">
                 <label class="group-title" for="name-${pId}">病人姓名</label>
@@ -475,7 +493,23 @@
         `;
 
         document.getElementById('patients-container').appendChild(card);
+        updateDeleteButtons();
         switchTab(pId);
+    }
+
+    // 動態更新刪除按鈕狀態與標題序號
+    function updateDeleteButtons() {
+        const canDelete = patientList.length > 1;
+        patientList.forEach((id, index) => {
+            const delBtn = document.getElementById(`btn-del-${id}`);
+            const cardTitle = document.getElementById(`card-title-${id}`);
+            if (delBtn) {
+                delBtn.style.display = canDelete ? 'inline-block' : 'none';
+            }
+            if (cardTitle) {
+                cardTitle.innerText = `👤 第 ${index + 1} 位看診病人`;
+            }
+        });
     }
 
     function switchTab(pId) {
@@ -506,15 +540,21 @@
     function removePatient(pId) {
         if (patientList.length <= 1) return;
 
+        const targetIndex = patientList.indexOf(pId);
         patientList = patientList.filter(id => id !== pId);
+        
         document.getElementById(`tab-${pId}`).remove();
         document.getElementById(`patient-card-${pId}`).remove();
 
+        // 重新計算頁籤名稱與標頭序號
         patientList.forEach((id) => {
             updateTabName(id);
         });
+        updateDeleteButtons();
 
-        switchTab(patientList[0]);
+        // 切換到相鄰的頁籤
+        const nextActiveId = patientList[targetIndex] || patientList[targetIndex - 1] || patientList[0];
+        switchTab(nextActiveId);
     }
 
     function toggleSymptom(pId, sId) {
@@ -535,7 +575,7 @@
         patientsCompiledData = [];
         let previewHtml = "";
         let hasError = false;
-        const totalPatients = patientList.length; // 自動計算當前總掛號人數
+        const totalPatients = patientList.length;
 
         for (let i = 0; i < totalPatients; i++) {
             const pId = patientList[i];
@@ -576,8 +616,7 @@
                 break;
             }
 
-            // 同一家人標記，格式為：同一家人(1/3)
-            const familyTag = totalPatients > 1 ? `同一家人(${i + 1}/${totalPatients})` : '';
+            const familyTag = totalPatients > 1 ? `同行(${i + 1}/${totalPatients})` : '';
             const qrPayload = `姓名:${name}|生日:${dob}${familyTag ? '|註記:' + familyTag : ''}|主訴:${selectedSymptoms.join(';')}`;
             
             patientsCompiledData.push({
@@ -593,7 +632,7 @@
                 <div class="preview-person-card">
                     <div class="person-info">
                         👤 ${name} （生日：${dob}） 
-                        ${familyTag ? `<span style="color:#1a56db; font-size:14px; float:right;">🏠 ${familyTag}</span>` : ''}
+                        ${familyTag ? `<span style="color:#1a56db; font-size:14px; float:right;">👥 ${familyTag}</span>` : ''}
                     </div>
                     <div>${symptomTags}</div>
                 </div>
@@ -618,84 +657,84 @@
         const qrListContainer = document.getElementById('qr-list');
         qrListContainer.innerHTML = "";
         
-        const todayStr = new Date().toISOString().split('T')[0];
+        const hiddenStore = document.getElementById('hidden-qr-store');
+        hiddenStore.innerHTML = "";
+        
+        const todayStr = getLocalDateString();
 
         document.getElementById('preview-area').style.display = 'none';
         document.getElementById('result-area').style.display = 'block';
         document.getElementById('result-area').scrollIntoView({ behavior: 'smooth' });
 
         patientsCompiledData.forEach((p, idx) => {
-            const qr = qrcode(0, 'M');
-            qr.addData(p.qrPayload);
-            qr.make();
+            const pDomId = `hidden-qr-${idx}`;
+            const pDom = document.createElement('div');
+            pDom.id = pDomId;
+            hiddenStore.appendChild(pDom);
 
-            const moduleCount = qr.getModuleCount();
-            const qrSize = 190; 
-            const cellSize = qrSize / moduleCount;
+            new QRCode(pDom, {
+                text: p.qrPayload,
+                width: 200,
+                height: 200,
+                colorDark: "#000000",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.H,
+                drawer: 'canvas'
+            });
 
-            const finalCanvas = document.createElement('canvas');
-            const ctx = finalCanvas.getContext('2d');
-            finalCanvas.width = 300;
-            finalCanvas.height = 360;
+            setTimeout(() => {
+                const sourceCanvas = pDom.querySelector('canvas');
 
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
+                const finalCanvas = document.createElement('canvas');
+                const ctx = finalCanvas.getContext('2d');
+                finalCanvas.width = 300;
+                finalCanvas.height = 360;
 
-            // 標題顯示姓名與「同一家人」標記
-            ctx.fillStyle = '#1e293b';
-            ctx.font = 'bold 20px sans-serif';
-            ctx.textAlign = 'center';
-            
-            const titleText = p.familyTag ? `${p.name} (${p.familyTag})` : p.name;
-            ctx.fillText(titleText, 150, 36);
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
 
-            ctx.fillStyle = '#64748b';
-            ctx.font = '14px sans-serif';
-            ctx.fillText(`生日：${p.dob}`, 150, 60);
+                ctx.fillStyle = '#1e293b';
+                ctx.font = 'bold 20px sans-serif';
+                ctx.textAlign = 'center';
+                
+                const titleText = p.familyTag ? `${p.name} (${p.familyTag})` : p.name;
+                ctx.fillText(titleText, 150, 36);
 
-            const offsetX = (300 - qrSize) / 2;
-            const offsetY = 75;
+                ctx.fillStyle = '#64748b';
+                ctx.font = '14px sans-serif';
+                ctx.fillText(`生日：${p.dob}`, 150, 60);
 
-            ctx.fillStyle = '#000000';
-            for (let row = 0; row < moduleCount; row++) {
-                for (let col = 0; col < moduleCount; col++) {
-                    if (qr.isDark(row, col)) {
-                        ctx.fillRect(
-                            offsetX + col * cellSize,
-                            offsetY + row * cellSize,
-                            cellSize + 0.5,
-                            cellSize + 0.5
-                        );
-                    }
+                if (sourceCanvas) {
+                    ctx.drawImage(sourceCanvas, 50, 75, 200, 200);
                 }
-            }
 
-            ctx.fillStyle = '#1a56db';
-            ctx.font = 'bold 13px sans-serif';
-            ctx.fillText(`眼科門診報到條碼 (${todayStr})`, 150, 305);
+                ctx.fillStyle = '#1a56db';
+                ctx.font = 'bold 13px sans-serif';
+                ctx.fillText(`眼科門診報到條碼 (${todayStr})`, 150, 305);
 
-            const imgDataUrl = finalCanvas.toDataURL('image/png');
-            const cleanDob = p.dob.replace(/-/g, '');
-            const filename = `${p.name}_${cleanDob}_報到條碼_${todayStr}.png`;
+                const imgDataUrl = finalCanvas.toDataURL('image/png');
+                const cleanDob = p.dob.replace(/-/g, '');
+                const filename = `${p.name}_${cleanDob}_報到條碼_${todayStr}.png`;
 
-            const card = document.createElement('div');
-            card.className = 'qr-person-card';
-            
-            card.innerHTML = `
-                <div class="person-info" style="text-align: center;">
-                    第 ${idx + 1} 位：${p.name} (${p.dob})
-                    ${p.familyTag ? `<span style="color:#1a56db; font-size:14px;"> - 🏠 ${p.familyTag}</span>` : ''}
-                </div>
-                <div class="generated-img-container">
-                    <img src="${imgDataUrl}" alt="${p.name} 的報到 QR Code">
-                </div>
-                <div>
-                    <a href="${imgDataUrl}" download="${filename}" class="btn-save">
-                        💾 下載條碼圖片 (${p.name})
-                    </a>
-                </div>
-            `;
-            qrListContainer.appendChild(card);
+                const card = document.createElement('div');
+                card.className = 'qr-person-card';
+                
+                card.innerHTML = `
+                    <div class="person-info" style="text-align: center;">
+                        第 ${idx + 1} 位：${p.name} (${p.dob})
+                        ${p.familyTag ? `<span style="color:#1a56db; font-size:14px;"> - 👥 ${p.familyTag}</span>` : ''}
+                    </div>
+                    <div class="generated-img-container">
+                        <img src="${imgDataUrl}" alt="${p.name} 的報到 QR Code">
+                    </div>
+                    <div>
+                        <a href="${imgDataUrl}" download="${filename}" class="btn-save">
+                            💾 下載條碼圖片 (${p.name})
+                        </a>
+                    </div>
+                `;
+                qrListContainer.appendChild(card);
+            }, 150 * (idx + 1));
         });
     }
 </script>
