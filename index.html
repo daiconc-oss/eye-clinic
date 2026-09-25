@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>眼科門診診前主訴報到 (pt ver.3.7 - 全員可刪除版)</title>
+    <title>眼科門診診前主訴報到 (pt ver.3.8 - 清爽預覽版)</title>
 
     <!-- 採用完整支援中文 UTF-8 編碼與 HTML5 Canvas 的 EasyQRCodeJS -->
     <script src="https://cdn.jsdelivr.net/npm/easyqrcodejs@4.5.0/dist/easy.qrcode.min.js"></script>
@@ -300,7 +300,7 @@
 
         /* 合成圖片容器 */
         .generated-img-container img {
-            width: 240px;
+            width: 250px;
             height: auto;
             border: 1px solid #cbd5e1;
             border-radius: 8px;
@@ -308,6 +308,7 @@
             margin: 10px auto;
             display: block;
             background-color: #fff;
+            -webkit-touch-callout: default;
         }
 
         .alert-text {
@@ -497,7 +498,6 @@
         switchTab(pId);
     }
 
-    // 動態更新刪除按鈕狀態與標題序號
     function updateDeleteButtons() {
         const canDelete = patientList.length > 1;
         patientList.forEach((id, index) => {
@@ -546,13 +546,11 @@
         document.getElementById(`tab-${pId}`).remove();
         document.getElementById(`patient-card-${pId}`).remove();
 
-        // 重新計算頁籤名稱與標頭序號
         patientList.forEach((id) => {
             updateTabName(id);
         });
         updateDeleteButtons();
 
-        // 切換到相鄰的頁籤
         const nextActiveId = patientList[targetIndex] || patientList[targetIndex - 1] || patientList[0];
         switchTab(nextActiveId);
     }
@@ -595,7 +593,7 @@
                 break;
             }
 
-            let selectedSymptoms = [];
+            let selectedSymptomsObj = [];
             let symptomTags = "";
 
             symptomsData.forEach(s => {
@@ -604,35 +602,50 @@
                     const eye = document.querySelector(`input[name="eye_${pId}_${s.id}"]:checked`).value;
                     const dur = document.querySelector(`input[name="dur_${pId}_${s.id}"]:checked`).value;
                     
-                    selectedSymptoms.push(`${s.code}[${eye}/${dur}]`);
+                    selectedSymptomsObj.push({
+                        c: s.code,
+                        e: eye,
+                        d: dur
+                    });
+
                     symptomTags += `<div class="symptom-tag">📌 ${s.code}（<b>${eye}</b> / <b>${dur}</b>）</div><br>`;
                 }
             });
 
-            if (selectedSymptoms.length === 0) {
+            if (selectedSymptomsObj.length === 0) {
                 alert(`請為【${name}】至少勾選一項看診原因！`);
                 switchTab(pId);
                 hasError = true;
                 break;
             }
 
-            const familyTag = totalPatients > 1 ? `同行(${i + 1}/${totalPatients})` : '';
-            const qrPayload = `姓名:${name}|生日:${dob}${familyTag ? '|註記:' + familyTag : ''}|主訴:${selectedSymptoms.join(';')}`;
-            
+            const familyTag = totalPatients > 1 ? `${i + 1}/${totalPatients}` : '';
+
+            const jsonPayloadObj = {
+                n: name,
+                b: dob,
+                cc: selectedSymptomsObj
+            };
+            if (familyTag) {
+                jsonPayloadObj.f = familyTag;
+            }
+
+            const qrJsonString = JSON.stringify(jsonPayloadObj);
+
             patientsCompiledData.push({
                 name: name,
                 dob: dob,
-                familyTag: familyTag,
+                familyTag: familyTag ? `同行(${familyTag})` : '',
                 totalPatients: totalPatients,
                 symptomsSummary: symptomTags,
-                qrPayload: qrPayload
+                qrPayload: qrJsonString
             });
 
             previewHtml += `
                 <div class="preview-person-card">
                     <div class="person-info">
                         👤 ${name} （生日：${dob}） 
-                        ${familyTag ? `<span style="color:#1a56db; font-size:14px; float:right;">👥 ${familyTag}</span>` : ''}
+                        ${familyTag ? `<span style="color:#1a56db; font-size:14px; float:right;">👥 同行(${familyTag})</span>` : ''}
                     </div>
                     <div>${symptomTags}</div>
                 </div>
@@ -678,64 +691,67 @@
                 height: 200,
                 colorDark: "#000000",
                 colorLight: "#ffffff",
-                correctLevel: QRCode.CorrectLevel.H,
-                drawer: 'canvas'
-            });
-
-            setTimeout(() => {
-                const sourceCanvas = pDom.querySelector('canvas');
-
-                const finalCanvas = document.createElement('canvas');
-                const ctx = finalCanvas.getContext('2d');
-                finalCanvas.width = 300;
-                finalCanvas.height = 360;
-
-                ctx.fillStyle = '#ffffff';
-                ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
-
-                ctx.fillStyle = '#1e293b';
-                ctx.font = 'bold 20px sans-serif';
-                ctx.textAlign = 'center';
-                
-                const titleText = p.familyTag ? `${p.name} (${p.familyTag})` : p.name;
-                ctx.fillText(titleText, 150, 36);
-
-                ctx.fillStyle = '#64748b';
-                ctx.font = '14px sans-serif';
-                ctx.fillText(`生日：${p.dob}`, 150, 60);
-
-                if (sourceCanvas) {
-                    ctx.drawImage(sourceCanvas, 50, 75, 200, 200);
+                correctLevel: QRCode.CorrectLevel.M,
+                drawer: 'canvas',
+                onRenderingEnd: function() {
+                    buildFinalImage(p, idx, pDom, todayStr);
                 }
-
-                ctx.fillStyle = '#1a56db';
-                ctx.font = 'bold 13px sans-serif';
-                ctx.fillText(`眼科門診報到條碼 (${todayStr})`, 150, 305);
-
-                const imgDataUrl = finalCanvas.toDataURL('image/png');
-                const cleanDob = p.dob.replace(/-/g, '');
-                const filename = `${p.name}_${cleanDob}_報到條碼_${todayStr}.png`;
-
-                const card = document.createElement('div');
-                card.className = 'qr-person-card';
-                
-                card.innerHTML = `
-                    <div class="person-info" style="text-align: center;">
-                        第 ${idx + 1} 位：${p.name} (${p.dob})
-                        ${p.familyTag ? `<span style="color:#1a56db; font-size:14px;"> - 👥 ${p.familyTag}</span>` : ''}
-                    </div>
-                    <div class="generated-img-container">
-                        <img src="${imgDataUrl}" alt="${p.name} 的報到 QR Code">
-                    </div>
-                    <div>
-                        <a href="${imgDataUrl}" download="${filename}" class="btn-save">
-                            💾 下載條碼圖片 (${p.name})
-                        </a>
-                    </div>
-                `;
-                qrListContainer.appendChild(card);
-            }, 150 * (idx + 1));
+            });
         });
+    }
+
+    function buildFinalImage(p, idx, pDom, todayStr) {
+        const sourceCanvas = pDom.querySelector('canvas');
+        if (!sourceCanvas) return;
+
+        const finalCanvas = document.createElement('canvas');
+        const ctx = finalCanvas.getContext('2d');
+        
+        finalCanvas.width = 320;
+        finalCanvas.height = 350;
+
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
+
+        ctx.fillStyle = '#1e293b';
+        ctx.font = 'bold 18px sans-serif';
+        ctx.textAlign = 'center';
+        const titleText = p.familyTag ? `${p.name} (${p.familyTag})` : p.name;
+        ctx.fillText(titleText, 160, 35);
+
+        ctx.fillStyle = '#64748b';
+        ctx.font = '14px sans-serif';
+        ctx.fillText(`生日：${p.dob}`, 160, 58);
+
+        ctx.drawImage(sourceCanvas, 60, 72, 200, 200);
+
+        ctx.fillStyle = '#1a56db';
+        ctx.font = 'bold 13px sans-serif';
+        ctx.fillText(`眼科門診報到條碼 (${todayStr})`, 160, 305);
+
+        const imgDataUrl = finalCanvas.toDataURL('image/png');
+        const cleanDob = p.dob.replace(/-/g, '');
+        const filename = `${p.name}_${cleanDob}_報到條碼_${todayStr}.png`;
+
+        const card = document.createElement('div');
+        card.className = 'qr-person-card';
+        
+        card.innerHTML = `
+            <div class="person-info" style="text-align: center;">
+                第 ${idx + 1} 位：${p.name} (${p.dob})
+                ${p.familyTag ? `<span style="color:#1a56db; font-size:14px;"> - 👥 ${p.familyTag}</span>` : ''}
+            </div>
+            <div class="generated-img-container">
+                <img src="${imgDataUrl}" alt="${p.name} 的報到 QR Code">
+            </div>
+            <div>
+                <a href="${imgDataUrl}" download="${filename}" class="btn-save">
+                    💾 下載條碼圖片 (${p.name})
+                </a>
+            </div>
+        `;
+        
+        document.getElementById('qr-list').appendChild(card);
     }
 </script>
 
