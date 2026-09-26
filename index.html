@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>眼科門診診前主訴報到 (pt ver.3.8 - 清爽預覽版)</title>
+    <title>眼科門診診前主訴報到 (pt ver 4.0)</title>
 
     <!-- 採用完整支援中文 UTF-8 編碼與 HTML5 Canvas 的 EasyQRCodeJS -->
     <script src="https://cdn.jsdelivr.net/npm/easyqrcodejs@4.5.0/dist/easy.qrcode.min.js"></script>
@@ -172,11 +172,37 @@
             border-top: 1px dashed #e2e8f0;
         }
         .detail-title {
-            font-size: 12px;
-            color: #64748b;
+            font-size: 13px;
+            color: #475569;
             font-weight: bold;
-            margin-top: 6px;
+            margin-top: 10px;
             margin-bottom: 6px;
+        }
+        .detail-title:first-child {
+            margin-top: 2px;
+        }
+
+        /* 第二層症狀勾選區 */
+        .sub-symptoms-grid {
+            display: grid;
+            grid-template-columns: repeat(1, 1fr);
+            gap: 6px;
+            margin-bottom: 10px;
+        }
+        .sub-item {
+            display: flex;
+            align-items: center;
+            background: #ffffff;
+            padding: 8px 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .sub-item input {
+            margin-right: 8px;
+            width: 16px;
+            height: 16px;
         }
 
         /* 按鈕選項組 */
@@ -289,13 +315,14 @@
         }
 
         .symptom-tag {
-            display: inline-block;
+            display: block;
             background-color: #eff6ff;
             color: #1d4ed8;
-            padding: 4px 8px;
-            border-radius: 4px;
+            padding: 6px 10px;
+            border-radius: 6px;
             font-size: 13px;
-            margin-top: 4px;
+            margin-top: 6px;
+            line-height: 1.4;
         }
 
         /* 合成圖片容器 */
@@ -332,7 +359,7 @@
 <body>
 
 <div class="container">
-    <h2>門診診前報到表</h2>
+    <h2>門診診前報到表 (pt ver 4.0)</h2>
     <div class="subtitle">可同時為多位家屬報到，每位將各自產生專屬條碼</div>
 
     <form id="checkin-form">
@@ -363,7 +390,6 @@
         <h3 style="color: #059669; margin-top: 0; text-align: center;">已完成報到設定！</h3>
         <p style="font-size: 14px; color: #4b5563; text-align: center;">請出示或保存以下專屬條碼，供櫃檯掃描列印小張貼紙</p>
 
-        <!-- 產出的 QR Code 卡片會被放入此區域 -->
         <div id="qr-list"></div>
 
         <div class="alert-text">
@@ -378,14 +404,96 @@
 <div id="hidden-qr-store"></div>
 
 <script>
-    const symptomsData = [
-        { id: 'cc1', name: '👓 驗光 / 視力模糊 / 配鏡', code: '視力模糊' },
-        { id: 'cc2', name: '👁️ 眼睛紅痛 / 乾澀 / 分泌物', code: '紅痛乾澀' },
-        { id: 'cc3', name: '🦟 飛蚊症 / 看見黑點 / 閃光', code: '飛蚊閃光' },
-        { id: 'cc4', name: '🩸 白內障 / 黃斑部諮詢追蹤', code: '白內障黃斑部' },
-        { id: 'cc5', name: '💊 慢性病拿藥 / 定期追蹤', code: '慢性病拿藥' },
-        { id: 'cc6', name: '📋 開立診斷證明書 / 收據', code: '開立證明' }
-    ];
+    // pt ver 4.0 完整的 TRIAGE_DATA 資料架構
+    const TRIAGE_DATA = {
+        // 第一層：主訴類別
+        categories: [
+            { id: 'cat_1', icon: '👁️', name: '看不清楚 / 視力問題', hasDetails: true },
+            { id: 'cat_2', icon: '🔴', name: '眼睛紅 / 癢 / 眼屎多', hasDetails: true },
+            { id: 'cat_3', icon: '⚡', name: '眼睛痛 / 刺痛 / 異物感', hasDetails: true },
+            { id: 'cat_4', icon: '💧', name: '眼睛乾 / 經常流眼淚', hasDetails: true },
+            { id: 'cat_5', icon: '🟡', name: '眼皮腫 / 長針眼 / 摸到硬塊', hasDetails: true },
+            { id: 'cat_6', icon: '🕷️', name: '眼前有黑點 / 閃光 / 影像變形', hasDetails: true },
+            { id: 'cat_7', icon: '🎒', name: '學童視力檢查 / 驗光', hasDetails: true },
+            { id: 'cat_8', icon: '🩺', name: '糖尿病眼睛定期檢查', hasDetails: true },
+            { id: 'cat_9', icon: '🔄', name: '白內障 / 青光眼 / 黃斑部病變 定期回診', hasDetails: true },
+            { id: 'cat_10', icon: '🏥', name: '術後回診', hasDetails: true }
+        ],
+
+        // 眼別通用選項
+        eyesOptions: [
+            { label: '右眼', value: 'OD' },
+            { label: '左眼', value: 'OS' },
+            { label: '雙眼', value: 'OU' }
+        ],
+
+        // 時間通用選項
+        durationOptions: [
+            { label: '今天', value: 'today' },
+            { label: '數天內', value: 'days' },
+            { label: '數週內', value: 'weeks' },
+            { label: '數月或更久', value: 'months' }
+        ],
+
+        // 第二層：各類別詳細症狀
+        subItems: {
+            cat_1: [
+                { id: 'sub_1_1', name: '看遠不清楚' },
+                { id: 'sub_1_2', name: '看近 / 看手機不清楚' },
+                { id: 'sub_1_3', name: '看東西有雙影' },
+                { id: 'sub_1_4', name: '長時間看螢幕眼睛容易疲勞' }
+            ],
+            cat_2: [
+                { id: 'sub_2_1', name: '眼睛非常癢' },
+                { id: 'sub_2_2', name: '眼白發紅 / 充血' },
+                { id: 'sub_2_3', name: '眼屎很多' },
+                { id: 'sub_2_4', name: '對光線敏感 / 畏光' }
+            ],
+            cat_3: [
+                { id: 'sub_3_1', name: '感覺有沙子 / 異物' },
+                { id: 'sub_3_2', name: '眨眼會刺痛' },
+                { id: 'sub_3_3', name: '眼睛受傷 / 噴到化學液體' },
+                { id: 'sub_3_4', name: '隱形眼鏡配戴不適' }
+            ],
+            cat_4: [
+                { id: 'sub_4_1', name: '眼睛乾澀 / 灼熱' },
+                { id: 'sub_4_2', name: '風吹或無故流眼淚' },
+                { id: 'sub_4_3', name: '補充人工淚液效果有限 / 刺刺的' }
+            ],
+            cat_5: [
+                { id: 'sub_5_1', name: '摸到痛痛的硬塊（針眼）' },
+                { id: 'sub_5_2', name: '眼皮整體紅腫' },
+                { id: 'sub_5_3', name: '睫毛倒插刺激眼睛' }
+            ],
+            cat_6: [
+                { id: 'sub_6_1', name: '眼前有黑點 / 飛蠅 / 陰影' },
+                { id: 'sub_6_2', name: '眼前出現像閃電的光芒' },
+                { id: 'sub_6_3', name: '看直線感覺變彎曲' }
+            ],
+            cat_7: [
+                { id: 'sub_7_1', name: '學校視力檢查複查（持通知單）' },
+                { id: 'sub_7_2', name: '點散瞳劑 / 追蹤近視度數' },
+                { id: 'sub_7_3', name: '角膜塑型片（OK鏡片）定期回診' },
+                { id: 'sub_7_4', name: '配鏡 / 驗光需求' }
+            ],
+            cat_8: [
+                { id: 'sub_8_1', name: '糖尿病眼底例行檢查（開立轉介單/定期追蹤）' },
+                { id: 'sub_8_2', name: '最近自覺視力有變差' },
+                { id: 'sub_8_3', name: '過去曾接受過眼底雷射或打針治療' }
+            ],
+            cat_9: [
+                { id: 'sub_9_1', name: '青光眼追蹤（拿藥 / 測眼壓）' },
+                { id: 'sub_9_2', name: '白內障追蹤 / 術後定期回診' },
+                { id: 'sub_9_3', name: '黃斑部病變追蹤 / 術後或打針後回診' }
+            ],
+            cat_10: [
+                { id: 'sub_10_1', name: '白內障術後追蹤 / 拆線' },
+                { id: 'sub_10_2', name: '屈光雷射（LASIK/SMILE等）術後追蹤' },
+                { id: 'sub_10_3', name: '眼皮 / 針眼 / 翼狀贅肉手術後追蹤' },
+                { id: 'sub_10_4', name: '網膜 / 黃斑部 / 青光眼手術或雷射/打針後追蹤' }
+            ]
+        }
+    };
 
     let patientCount = 0;
     let patientList = [];
@@ -426,48 +534,63 @@
         card.id = `patient-card-${pId}`;
 
         let symptomsHtml = "";
-        symptomsData.forEach(s => {
-            symptomsHtml += `
-                <div class="symptom-card" id="card-${pId}-${s.id}">
-                    <div class="symptom-header">
-                        <input type="checkbox" id="${pId}-${s.id}" value="${s.code}" onchange="toggleSymptom('${pId}', '${s.id}')">
-                        <label for="${pId}-${s.id}">${s.name}</label>
+        TRIAGE_DATA.categories.forEach(cat => {
+            const subItems = TRIAGE_DATA.subItems[cat.id] || [];
+            let subItemsHtml = "";
+            
+            subItems.forEach(sub => {
+                subItemsHtml += `
+                    <label class="sub-item">
+                        <input type="checkbox" id="sub_${pId}_${cat.id}_${sub.id}" value="${sub.id}" data-name="${sub.name}">
+                        ${sub.name}
+                    </label>
+                `;
+            });
+
+            // 動態眼別 radio
+            let eyesHtml = "";
+            TRIAGE_DATA.eyesOptions.forEach((eye, idx) => {
+                const checked = eye.value === 'OU' ? 'checked' : '';
+                eyesHtml += `
+                    <div class="btn-option">
+                        <input type="radio" id="eye_${pId}_${cat.id}_${eye.value}" name="eye_${pId}_${cat.id}" value="${eye.value}" data-label="${eye.label}" ${checked}>
+                        <label for="eye_${pId}_${cat.id}_${eye.value}">${eye.label}(${eye.value})</label>
                     </div>
-                    <div class="symptom-details" id="details-${pId}-${s.id}">
-                        <div class="detail-title">請問是哪一隻眼睛？</div>
-                        <div class="btn-group grid-3">
-                            <div class="btn-option">
-                                <input type="radio" id="eye_${pId}_${s.id}_r" name="eye_${pId}_${s.id}" value="右眼">
-                                <label for="eye_${pId}_${s.id}_r">右眼(OD)</label>
-                            </div>
-                            <div class="btn-option">
-                                <input type="radio" id="eye_${pId}_${s.id}_l" name="eye_${pId}_${s.id}" value="左眼">
-                                <label for="eye_${pId}_${s.id}_l">左眼(OS)</label>
-                            </div>
-                            <div class="btn-option">
-                                <input type="radio" id="eye_${pId}_${s.id}_b" name="eye_${pId}_${s.id}" value="雙眼" checked>
-                                <label for="eye_${pId}_${s.id}_b">雙眼(OU)</label>
-                            </div>
+                `;
+            });
+
+            // 動態時間 radio
+            let durationHtml = "";
+            TRIAGE_DATA.durationOptions.forEach((dur, idx) => {
+                const checked = dur.value === 'today' ? 'checked' : '';
+                durationHtml += `
+                    <div class="btn-option">
+                        <input type="radio" id="dur_${pId}_${cat.id}_${dur.value}" name="dur_${pId}_${cat.id}" value="${dur.value}" data-label="${dur.label}" ${checked}>
+                        <label for="dur_${pId}_${cat.id}_${dur.value}">${dur.label}</label>
+                    </div>
+                `;
+            });
+
+            symptomsHtml += `
+                <div class="symptom-card" id="card-${pId}-${cat.id}">
+                    <div class="symptom-header">
+                        <input type="checkbox" id="${pId}-${cat.id}" value="${cat.id}" onchange="toggleSymptom('${pId}', '${cat.id}')">
+                        <label for="${pId}-${cat.id}">${cat.icon} ${cat.name}</label>
+                    </div>
+                    <div class="symptom-details" id="details-${pId}-${cat.id}">
+                        <div class="detail-title">請勾選具體狀況（可多選）：</div>
+                        <div class="sub-symptoms-grid">
+                            ${subItemsHtml}
                         </div>
 
-                        <div class="detail-title">這項症狀持續多久了？</div>
+                        <div class="detail-title">請問是哪一隻眼睛？</div>
+                        <div class="btn-group grid-3">
+                            ${eyesHtml}
+                        </div>
+
+                        <div class="detail-title">狀況持續時間：</div>
                         <div class="btn-group grid-4">
-                            <div class="btn-option">
-                                <input type="radio" id="dur_${pId}_${s.id}_1" name="dur_${pId}_${s.id}" value="今天剛發生" checked>
-                                <label for="dur_${pId}_${s.id}_1">今天剛發生</label>
-                            </div>
-                            <div class="btn-option">
-                                <input type="radio" id="dur_${pId}_${s.id}_2" name="dur_${pId}_${s.id}" value="數天內">
-                                <label for="dur_${pId}_${s.id}_2">數天內</label>
-                            </div>
-                            <div class="btn-option">
-                                <input type="radio" id="dur_${pId}_${s.id}_3" name="dur_${pId}_${s.id}" value="數週內">
-                                <label for="dur_${pId}_${s.id}_3">數週內</label>
-                            </div>
-                            <div class="btn-option">
-                                <input type="radio" id="dur_${pId}_${s.id}_4" name="dur_${pId}_${s.id}" value="數月/更久">
-                                <label for="dur_${pId}_${s.id}_4">數月或更久</label>
-                            </div>
+                            ${durationHtml}
                         </div>
                     </div>
                 </div>
@@ -488,7 +611,7 @@
                 <input type="date" id="dob-${pId}" required>
             </div>
             <div class="form-group">
-                <label class="group-title">今日看診原因與狀況（可多選）</label>
+                <label class="group-title">今日看診主要原因（可複選分類）</label>
                 <div>${symptomsHtml}</div>
             </div>
         `;
@@ -555,10 +678,10 @@
         switchTab(nextActiveId);
     }
 
-    function toggleSymptom(pId, sId) {
-        const checkbox = document.getElementById(`${pId}-${sId}`);
-        const card = document.getElementById(`card-${pId}-${sId}`);
-        const details = document.getElementById(`details-${pId}-${sId}`);
+    function toggleSymptom(pId, catId) {
+        const checkbox = document.getElementById(`${pId}-${catId}`);
+        const card = document.getElementById(`card-${pId}-${catId}`);
+        const details = document.getElementById(`details-${pId}-${catId}`);
 
         if (checkbox.checked) {
             card.classList.add('active');
@@ -596,24 +719,50 @@
             let selectedSymptomsObj = [];
             let symptomTags = "";
 
-            symptomsData.forEach(s => {
-                const checkbox = document.getElementById(`${pId}-${s.id}`);
-                if (checkbox && checkbox.checked) {
-                    const eye = document.querySelector(`input[name="eye_${pId}_${s.id}"]:checked`).value;
-                    const dur = document.querySelector(`input[name="dur_${pId}_${s.id}"]:checked`).value;
+            TRIAGE_DATA.categories.forEach(cat => {
+                const mainCheckbox = document.getElementById(`${pId}-${cat.id}`);
+                if (mainCheckbox && mainCheckbox.checked) {
+                    const selectedEyeRadio = document.querySelector(`input[name="eye_${pId}_${cat.id}"]:checked`);
+                    const selectedDurRadio = document.querySelector(`input[name="dur_${pId}_${cat.id}"]:checked`);
+
+                    const eyeValue = selectedEyeRadio ? selectedEyeRadio.value : 'OU';
+                    const eyeLabel = selectedEyeRadio ? selectedEyeRadio.getAttribute('data-label') : '雙眼';
+
+                    const durValue = selectedDurRadio ? selectedDurRadio.value : 'today';
+                    const durLabel = selectedDurRadio ? selectedDurRadio.getAttribute('data-label') : '今天';
                     
-                    selectedSymptomsObj.push({
-                        c: s.code,
-                        e: eye,
-                        d: dur
+                    // 收集第二層勾選項目
+                    let subSelectedIds = [];
+                    let subSelectedNames = [];
+                    const subItems = TRIAGE_DATA.subItems[cat.id] || [];
+                    
+                    subItems.forEach(sub => {
+                        const subChk = document.getElementById(`sub_${pId}_${cat.id}_${sub.id}`);
+                        if (subChk && subChk.checked) {
+                            subSelectedIds.push(sub.id);
+                            subSelectedNames.push(sub.name);
+                        }
                     });
 
-                    symptomTags += `<div class="symptom-tag">📌 ${s.code}（<b>${eye}</b> / <b>${dur}</b>）</div><br>`;
+                    selectedSymptomsObj.push({
+                        catId: cat.id,
+                        eye: eyeValue,
+                        dur: durValue,
+                        subs: subSelectedIds
+                    });
+
+                    const subStr = subSelectedNames.length > 0 ? `：${subSelectedNames.join('、')}` : '';
+                    symptomTags += `
+                        <div class="symptom-tag">
+                            <b>${cat.icon} ${cat.name}</b>${subStr}<br>
+                            <span style="font-size:12px; color:#475569;">📍 眼別：${eyeLabel} (${eyeValue}) | 時間：${durLabel}</span>
+                        </div>
+                    `;
                 }
             });
 
             if (selectedSymptomsObj.length === 0) {
-                alert(`請為【${name}】至少勾選一項看診原因！`);
+                alert(`請為【${name}】至少勾選一項看診原因類別！`);
                 switchTab(pId);
                 hasError = true;
                 break;
@@ -622,6 +771,7 @@
             const familyTag = totalPatients > 1 ? `${i + 1}/${totalPatients}` : '';
 
             const jsonPayloadObj = {
+                v: "4.0",
                 n: name,
                 b: dob,
                 cc: selectedSymptomsObj
@@ -630,15 +780,13 @@
                 jsonPayloadObj.f = familyTag;
             }
 
-            const qrJsonString = JSON.stringify(jsonPayloadObj);
-
             patientsCompiledData.push({
                 name: name,
                 dob: dob,
                 familyTag: familyTag ? `同行(${familyTag})` : '',
                 totalPatients: totalPatients,
                 symptomsSummary: symptomTags,
-                qrPayload: qrJsonString
+                qrPayload: JSON.stringify(jsonPayloadObj)
             });
 
             previewHtml += `
@@ -700,6 +848,7 @@
         });
     }
 
+    // 2x Retina 高解析度 Canvas 繪製技術
     function buildFinalImage(p, idx, pDom, todayStr) {
         const sourceCanvas = pDom.querySelector('canvas');
         if (!sourceCanvas) return;
@@ -707,27 +856,28 @@
         const finalCanvas = document.createElement('canvas');
         const ctx = finalCanvas.getContext('2d');
         
-        finalCanvas.width = 320;
-        finalCanvas.height = 350;
+        const scale = 2;
+        finalCanvas.width = 320 * scale;
+        finalCanvas.height = 350 * scale;
 
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
 
         ctx.fillStyle = '#1e293b';
-        ctx.font = 'bold 18px sans-serif';
+        ctx.font = `bold ${18 * scale}px sans-serif`;
         ctx.textAlign = 'center';
         const titleText = p.familyTag ? `${p.name} (${p.familyTag})` : p.name;
-        ctx.fillText(titleText, 160, 35);
+        ctx.fillText(titleText, 160 * scale, 35 * scale);
 
         ctx.fillStyle = '#64748b';
-        ctx.font = '14px sans-serif';
-        ctx.fillText(`生日：${p.dob}`, 160, 58);
+        ctx.font = `${14 * scale}px sans-serif`;
+        ctx.fillText(`生日：${p.dob}`, 160 * scale, 58 * scale);
 
-        ctx.drawImage(sourceCanvas, 60, 72, 200, 200);
+        ctx.drawImage(sourceCanvas, 60 * scale, 72 * scale, 200 * scale, 200 * scale);
 
         ctx.fillStyle = '#1a56db';
-        ctx.font = 'bold 13px sans-serif';
-        ctx.fillText(`眼科門診報到條碼 (${todayStr})`, 160, 305);
+        ctx.font = `bold ${13 * scale}px sans-serif`;
+        ctx.fillText(`眼科門診報到條碼 v4.0 (${todayStr})`, 160 * scale, 305 * scale);
 
         const imgDataUrl = finalCanvas.toDataURL('image/png');
         const cleanDob = p.dob.replace(/-/g, '');
