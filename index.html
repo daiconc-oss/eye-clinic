@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>眼科門診診前主訴報到 (pt ver 4.0)</title>
 
-    <!-- 採用完整支援中文 UTF-8 編碼與 HTML5 Canvas 的 EasyQRCodeJS -->
+    <!-- EasyQRCodeJS -->
     <script src="https://cdn.jsdelivr.net/npm/easyqrcodejs@4.5.0/dist/easy.qrcode.min.js"></script>
 
     <style>
@@ -38,8 +38,26 @@
             text-align: center;
             color: #666;
             font-size: 13px;
-            margin-bottom: 16px;
+            margin-bottom: 8px;
         }
+        
+        /* 隱私資安提示標籤 */
+        .privacy-badge {
+            background-color: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            color: #15803d;
+            font-size: 12px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            text-align: center;
+            margin-bottom: 16px;
+            line-height: 1.4;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
         .form-group {
             margin-bottom: 16px;
         }
@@ -361,6 +379,11 @@
 <div class="container">
     <h2>門診診前報到表 (pt ver 4.0)</h2>
     <div class="subtitle">可同時為多位家屬報到，每位將各自產生專屬條碼</div>
+    
+    <!-- 個資與安全宣告 -->
+    <div class="privacy-badge">
+        🔒 <b>安心保障</b>：本頁面資料僅在您手機端計算產生條碼，線上資料庫<b>絕不儲存</b>任何個人資料與病歷紀錄。
+    </div>
 
     <form id="checkin-form">
         <div id="form-inputs">
@@ -404,9 +427,8 @@
 <div id="hidden-qr-store"></div>
 
 <script>
-    // pt ver 4.0 完整的 TRIAGE_DATA 資料架構
+    // pt ver 4.0 TRIAGE_DATA 資料架構 (含 11. 其他原因)
     const TRIAGE_DATA = {
-        // 第一層：主訴類別
         categories: [
             { id: 'cat_1', icon: '👁️', name: '看不清楚 / 視力問題', hasDetails: true },
             { id: 'cat_2', icon: '🔴', name: '眼睛紅 / 癢 / 眼屎多', hasDetails: true },
@@ -417,17 +439,16 @@
             { id: 'cat_7', icon: '🎒', name: '學童視力檢查 / 驗光', hasDetails: true },
             { id: 'cat_8', icon: '🩺', name: '糖尿病眼睛定期檢查', hasDetails: true },
             { id: 'cat_9', icon: '🔄', name: '白內障 / 青光眼 / 黃斑部病變 定期回診', hasDetails: true },
-            { id: 'cat_10', icon: '🏥', name: '術後回診', hasDetails: true }
+            { id: 'cat_10', icon: '🏥', name: '術後回診', hasDetails: true },
+            { id: 'cat_11', icon: '✍️', name: '其他原因', isCustomText: true }
         ],
 
-        // 眼別通用選項
         eyesOptions: [
             { label: '右眼', value: 'OD' },
             { label: '左眼', value: 'OS' },
             { label: '雙眼', value: 'OU' }
         ],
 
-        // 時間通用選項
         durationOptions: [
             { label: '今天', value: 'today' },
             { label: '數天內', value: 'days' },
@@ -435,7 +456,6 @@
             { label: '數月或更久', value: 'months' }
         ],
 
-        // 第二層：各類別詳細症狀
         subItems: {
             cat_1: [
                 { id: 'sub_1_1', name: '看遠不清楚' },
@@ -535,21 +555,37 @@
 
         let symptomsHtml = "";
         TRIAGE_DATA.categories.forEach(cat => {
-            const subItems = TRIAGE_DATA.subItems[cat.id] || [];
-            let subItemsHtml = "";
-            
-            subItems.forEach(sub => {
-                subItemsHtml += `
-                    <label class="sub-item">
-                        <input type="checkbox" id="sub_${pId}_${cat.id}_${sub.id}" value="${sub.id}" data-name="${sub.name}">
-                        ${sub.name}
-                    </label>
-                `;
-            });
+            let subContentHtml = "";
 
-            // 動態眼別 radio
+            if (cat.isCustomText) {
+                // cat_11 其他原因：呈現輸入框
+                subContentHtml = `
+                    <div class="detail-title">請輸入具體來診原因：</div>
+                    <input type="text" id="custom_text_${pId}_${cat.id}" placeholder="例：定期拿藥、眼睛外傷、其他諮詢等" style="margin-bottom: 10px;">
+                `;
+            } else {
+                const subItems = TRIAGE_DATA.subItems[cat.id] || [];
+                let subItemsHtml = "";
+                subItems.forEach(sub => {
+                    subItemsHtml += `
+                        <label class="sub-item">
+                            <input type="checkbox" id="sub_${pId}_${cat.id}_${sub.id}" value="${sub.id}" data-name="${sub.name}">
+                            ${sub.name}
+                        </label>
+                    `;
+                });
+
+                subContentHtml = `
+                    <div class="detail-title">請勾選具體狀況（可多選）：</div>
+                    <div class="sub-symptoms-grid">
+                        ${subItemsHtml}
+                    </div>
+                `;
+            }
+
+            // 眼別按鈕
             let eyesHtml = "";
-            TRIAGE_DATA.eyesOptions.forEach((eye, idx) => {
+            TRIAGE_DATA.eyesOptions.forEach(eye => {
                 const checked = eye.value === 'OU' ? 'checked' : '';
                 eyesHtml += `
                     <div class="btn-option">
@@ -559,9 +595,9 @@
                 `;
             });
 
-            // 動態時間 radio
+            // 時間按鈕
             let durationHtml = "";
-            TRIAGE_DATA.durationOptions.forEach((dur, idx) => {
+            TRIAGE_DATA.durationOptions.forEach(dur => {
                 const checked = dur.value === 'today' ? 'checked' : '';
                 durationHtml += `
                     <div class="btn-option">
@@ -578,10 +614,7 @@
                         <label for="${pId}-${cat.id}">${cat.icon} ${cat.name}</label>
                     </div>
                     <div class="symptom-details" id="details-${pId}-${cat.id}">
-                        <div class="detail-title">請勾選具體狀況（可多選）：</div>
-                        <div class="sub-symptoms-grid">
-                            ${subItemsHtml}
-                        </div>
+                        ${subContentHtml}
 
                         <div class="detail-title">請問是哪一隻眼睛？</div>
                         <div class="btn-group grid-3">
@@ -731,18 +764,25 @@
                     const durValue = selectedDurRadio ? selectedDurRadio.value : 'today';
                     const durLabel = selectedDurRadio ? selectedDurRadio.getAttribute('data-label') : '今天';
                     
-                    // 收集第二層勾選項目
                     let subSelectedIds = [];
                     let subSelectedNames = [];
-                    const subItems = TRIAGE_DATA.subItems[cat.id] || [];
-                    
-                    subItems.forEach(sub => {
-                        const subChk = document.getElementById(`sub_${pId}_${cat.id}_${sub.id}`);
-                        if (subChk && subChk.checked) {
-                            subSelectedIds.push(sub.id);
-                            subSelectedNames.push(sub.name);
+
+                    if (cat.isCustomText) {
+                        const customVal = document.getElementById(`custom_text_${pId}_${cat.id}`).value.trim();
+                        if (customVal) {
+                            subSelectedNames.push(customVal);
+                            subSelectedIds.push(customVal);
                         }
-                    });
+                    } else {
+                        const subItems = TRIAGE_DATA.subItems[cat.id] || [];
+                        subItems.forEach(sub => {
+                            const subChk = document.getElementById(`sub_${pId}_${cat.id}_${sub.id}`);
+                            if (subChk && subChk.checked) {
+                                subSelectedIds.push(sub.id);
+                                subSelectedNames.push(sub.name);
+                            }
+                        });
+                    }
 
                     selectedSymptomsObj.push({
                         catId: cat.id,
