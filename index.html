@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>眼科門診診前主訴報到 (pt ver 4.0)</title>
+    <title>聚英視光眼科問診系統 (pt ver 4.0)</title>
 
     <!-- EasyQRCodeJS -->
     <script src="https://cdn.jsdelivr.net/npm/easyqrcodejs@4.5.0/dist/easy.qrcode.min.js"></script>
@@ -378,11 +378,11 @@
 
 <div class="container">
     <h2>門診診前報到表 (pt ver 4.0)</h2>
-    <div class="subtitle">可同時為多位家屬報到，每位將各自產生專屬條碼</div>
+    <div class="subtitle">可同時為多位家屬報到，各自產生專屬條碼</div>
     
     <!-- 個資與安全宣告 -->
     <div class="privacy-badge">
-        🔒 <b>安心保障</b>：本頁面資料僅在您手機端計算產生條碼，線上資料庫<b>絕不儲存</b>任何個人資料與病歷紀錄。
+        🔒 <b>安心保障</b>：本頁資料僅在您手機端產生條碼<b>絕不儲存</b>任何個人資料與病歷紀錄。
     </div>
 
     <form id="checkin-form">
@@ -410,8 +410,8 @@
 
     <!-- 掃瞄結果區 -->
     <div id="result-area">
-        <h3 style="color: #059669; margin-top: 0; text-align: center;">已完成報到設定！</h3>
-        <p style="font-size: 14px; color: #4b5563; text-align: center;">請出示或保存以下專屬條碼，供櫃檯掃描列印小張貼紙</p>
+        <h3 style="color: #059669; margin-top: 0; text-align: center;">已完成問診！</h3>
+        <p style="font-size: 14px; color: #4b5563; text-align: center;">請出示以下專屬條碼，供櫃檯掃描掛號</p>
 
         <div id="qr-list"></div>
 
@@ -466,7 +466,7 @@
             cat_2: [
                 { id: 'sub_2_1', name: '眼睛非常癢' },
                 { id: 'sub_2_2', name: '眼白發紅 / 充血' },
-                { id: 'sub_2_3', name: '眼屎很多' },
+                { id: 'sub_2_3', name: '起床眼屎很多' },
                 { id: 'sub_2_4', name: '對光線敏感 / 畏光' }
             ],
             cat_3: [
@@ -486,7 +486,7 @@
                 { id: 'sub_5_3', name: '睫毛倒插刺激眼睛' }
             ],
             cat_6: [
-                { id: 'sub_6_1', name: '眼前有黑點 / 飛蠅 / 陰影' },
+                { id: 'sub_6_1', name: '眼前有黑點 / 飛蚊 / 漂浮物' },
                 { id: 'sub_6_2', name: '眼前出現像閃電的光芒' },
                 { id: 'sub_6_3', name: '看直線感覺變彎曲' }
             ],
@@ -494,11 +494,11 @@
                 { id: 'sub_7_1', name: '學校視力檢查複查（持通知單）' },
                 { id: 'sub_7_2', name: '點散瞳劑 / 追蹤近視度數' },
                 { id: 'sub_7_3', name: '角膜塑型片（OK鏡片）定期回診' },
-                { id: 'sub_7_4', name: '配鏡 / 驗光需求' }
+                { id: 'sub_7_4', name: '塑形評估 / 配鏡需求' }
             ],
             cat_8: [
-                { id: 'sub_8_1', name: '糖尿病眼底例行檢查（開立轉介單/定期追蹤）' },
-                { id: 'sub_8_2', name: '最近自覺視力有變差' },
+                { id: 'sub_8_1', name: '糖尿病眼底例行檢查（有轉介單/定期追蹤）' },
+                { id: 'sub_8_2', name: '最近發現有糖尿病' },
                 { id: 'sub_8_3', name: '過去曾接受過眼底雷射或打針治療' }
             ],
             cat_9: [
@@ -507,7 +507,7 @@
                 { id: 'sub_9_3', name: '黃斑部病變追蹤 / 術後或打針後回診' }
             ],
             cat_10: [
-                { id: 'sub_10_1', name: '白內障術後追蹤 / 拆線' },
+                { id: 'sub_10_1', name: '白內障術後追蹤' },
                 { id: 'sub_10_2', name: '屈光雷射（LASIK/SMILE等）術後追蹤' },
                 { id: 'sub_10_3', name: '眼皮 / 針眼 / 翼狀贅肉手術後追蹤' },
                 { id: 'sub_10_4', name: '網膜 / 黃斑部 / 青光眼手術或雷射/打針後追蹤' }
@@ -561,7 +561,7 @@
                 // cat_11 其他原因：呈現輸入框
                 subContentHtml = `
                     <div class="detail-title">請輸入具體來診原因：</div>
-                    <input type="text" id="custom_text_${pId}_${cat.id}" placeholder="例：定期拿藥、眼睛外傷、其他諮詢等" style="margin-bottom: 10px;">
+                    <input type="text" id="custom_text_${pId}_${cat.id}" placeholder="例：定期拿藥、開診斷書、其他諮詢等" style="margin-bottom: 10px;">
                 `;
             } else {
                 const subItems = TRIAGE_DATA.subItems[cat.id] || [];
